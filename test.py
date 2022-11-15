@@ -13,6 +13,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import cv2
 
+
 def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='vis_results/parsing_map_on_im.jpg'):
     # Colors for all 20 parts
     part_colors = [
@@ -55,24 +56,25 @@ def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='vis_res
 
     # Save result or not
     if save_im:
+
         cv2.imwrite(save_path[:-4] +'.png', vis_parsing_anno)
         cv2.imwrite(save_path, vis_im, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-    # return vis_im
+    return vis_im
 
 
 # Основная функция разбиения лица на сегменты
-def evaluate(respath='./res', dspth='./data', modelpath='./model/final.pth'):
+def evaluate_folder(input_path='./data', output_path='./result', model_path='./model/final.pth'):
 
     # Если директория для сохранения не существует, то будет создана
-    if not os.path.exists(respath):
-        os.makedirs(respath)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
     # Настройка модели
     n_classes = 19
     net = BiSeNet(n_classes=n_classes)
     net.cuda()
-    net.load_state_dict(torch.load(modelpath))
+    net.load_state_dict(torch.load(model_path))
     net.eval()
 
     to_tensor = transforms.Compose([
@@ -81,8 +83,8 @@ def evaluate(respath='./res', dspth='./data', modelpath='./model/final.pth'):
     ])
 
     with torch.no_grad():
-        for image_path in os.listdir(dspth):
-            img = Image.open(os.path.join(dspth, image_path))
+        for image_path in os.listdir(input_path):
+            img = Image.open(os.path.join(input_path, image_path))
             image = img.resize((512, 512), Image.BILINEAR)
             img = to_tensor(image)
             img = torch.unsqueeze(img, 0)
@@ -90,11 +92,42 @@ def evaluate(respath='./res', dspth='./data', modelpath='./model/final.pth'):
             out = net(img)[0]
             parsing = out.squeeze(0).cpu().numpy().argmax(0)
             
-            vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path=os.path.join(respath, image_path))
-            return np.unique(parsing)
+            vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path=os.path.join(output_path, image_path))
 
 
-# Возвращает вектор найденных меток лица (всего 19)
+def evaluate_image(img, model_path='./model/final.pth'):
+
+    # Настройка модели
+    n_classes = 19
+    net = BiSeNet(n_classes=n_classes)
+    net.cuda()
+    net.load_state_dict(torch.load(model_path))
+    net.eval()
+
+    to_tensor = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
+
+    with torch.no_grad():
+        image = img.resize((512, 512), Image.BILINEAR)
+        img = to_tensor(image)
+        img = torch.unsqueeze(img, 0)
+        img = img.cuda()
+        out = net(img)[0]
+        parsing = out.squeeze(0).cpu().numpy().argmax(0)
+            
+        vis_img = vis_parsing_maps(image, parsing, stride=1, save_im=False)
+        return vis_img, np.unique(parsing)
+
+
+
+
+
+# def parse_folder(input_path='./test', output_path='./result'):
+#     evaluate(dspth=input_path, respath=output_path)
+
+
 #   0:  'background'
 #   1:  'skin'
 #   2:  'nose'
@@ -114,13 +147,4 @@ def evaluate(respath='./res', dspth='./data', modelpath='./model/final.pth'):
 #   16: 'neck_l'
 #   17: 'neck'
 #   18: 'cloth'
-if __name__ == "__main__":
-    #model_path = sys.argv[1]
-    #test_path = sys.argv[2]
 
-    #find_classes = evaluate(dspth=test_path, modelpath=model_path, respath=test_path)
-
-    test_path = './test'
-    result_path = './result'
-    find_classes = evaluate(dspth=test_path, respath=result_path)
-    print(find_classes)

@@ -108,5 +108,8 @@ model/
 result/
 test/
 
+# testing script
+main.py
+
 .idea/
 
