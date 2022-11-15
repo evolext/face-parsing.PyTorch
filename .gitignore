@@ -103,8 +103,10 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# res
-res/
+# file folders
+model/
+result/
+test/
 
 .idea/
 

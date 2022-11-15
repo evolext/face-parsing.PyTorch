@@ -15,15 +15,27 @@ import cv2
 
 def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='vis_results/parsing_map_on_im.jpg'):
     # Colors for all 20 parts
-    part_colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0],
-                   [255, 0, 85], [255, 0, 170],
-                   [0, 255, 0], [85, 255, 0], [170, 255, 0],
-                   [0, 255, 85], [0, 255, 170],
-                   [0, 0, 255], [85, 0, 255], [170, 0, 255],
-                   [0, 85, 255], [0, 170, 255],
-                   [255, 255, 0], [255, 255, 85], [255, 255, 170],
-                   [255, 0, 255], [255, 85, 255], [255, 170, 255],
-                   [0, 255, 255], [85, 255, 255], [170, 255, 255]]
+    part_colors = [
+        [255, 0, 0 ],      # 0:  ?
+        [255, 85, 0],      # 1:  skin
+        [55, 170, 0],      # 2:  l_brow
+        [255, 0, 85],      # 3:  r_brow
+        [55, 0, 170],      # 4:  l_eye 
+        [0, 255, 0],       # 5:  r_eye
+        [85, 255, 0],      # 6:  ?
+        [170, 255, 0],     # 7:  l_ear
+        [0, 255, 85],      # 8:  r_ear
+        [0, 255, 170],     # 9:  ?
+        [0, 0, 255],       # 10: nose
+        [85, 0, 255],      # 11: ?
+        [170, 0, 255],     # 12: u_lip
+        [0, 85, 255],      # 13: l_lip
+        [0, 170, 255],     # 14: neck
+        [255, 255, 0],     # 15: ?
+        [255, 170, 255],   # 16: cloth
+        [255, 255, 170],   # 17: hair
+        [255, 0, 255],     # 18: hat (то, что определяется сверху)
+    ]
 
     im = np.array(im)
     vis_im = im.copy().astype(np.uint8)
@@ -48,43 +60,67 @@ def vis_parsing_maps(im, parsing_anno, stride, save_im=False, save_path='vis_res
 
     # return vis_im
 
-def evaluate(respth='./res/test_res', dspth='./data', cp='model_final_diss.pth'):
 
-    if not os.path.exists(respth):
-        os.makedirs(respth)
+# Основная функция разбиения лица на сегменты
+def evaluate(respath='./res', dspth='./data', modelpath='./model/final.pth'):
 
+    # Если директория для сохранения не существует, то будет создана
+    if not os.path.exists(respath):
+        os.makedirs(respath)
+
+    # Настройка модели
     n_classes = 19
     net = BiSeNet(n_classes=n_classes)
     net.cuda()
-    save_pth = osp.join('res/cp', cp)
-    net.load_state_dict(torch.load(save_pth))
+    net.load_state_dict(torch.load(modelpath))
     net.eval()
 
     to_tensor = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
+
     with torch.no_grad():
         for image_path in os.listdir(dspth):
-            img = Image.open(osp.join(dspth, image_path))
+            img = Image.open(os.path.join(dspth, image_path))
             image = img.resize((512, 512), Image.BILINEAR)
             img = to_tensor(image)
             img = torch.unsqueeze(img, 0)
             img = img.cuda()
             out = net(img)[0]
             parsing = out.squeeze(0).cpu().numpy().argmax(0)
-            # print(parsing)
-            print(np.unique(parsing))
-
-            vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path=osp.join(respth, image_path))
-
+            
+            vis_parsing_maps(image, parsing, stride=1, save_im=True, save_path=os.path.join(respath, image_path))
+            return np.unique(parsing)
 
 
-
-
-
-
+# Возвращает вектор найденных меток лица (всего 19)
+#   0:  'background'
+#   1:  'skin'
+#   2:  'nose'
+#   3:  'eye_g'
+#   4:  'l_eye'
+#   5:  'r_eye'
+#   6:  'l_brow'
+#   7:  'r_brow'
+#   8:  'l_ear'
+#   9:  'r_ear'
+#   10: 'mouth'
+#   11: 'u_lip'
+#   12: 'l_lip'
+#   13: 'hair'
+#   14: 'hat'
+#   15: 'ear_r'
+#   16: 'neck_l'
+#   17: 'neck'
+#   18: 'cloth'
 if __name__ == "__main__":
-    evaluate(dspth='/home/zll/data/CelebAMask-HQ/test-img', cp='79999_iter.pth')
+    #model_path = sys.argv[1]
+    #test_path = sys.argv[2]
 
+    #find_classes = evaluate(dspth=test_path, modelpath=model_path, respath=test_path)
 
+    test_path = './test'
+    result_path = './result'
+    find_classes = evaluate(dspth=test_path, respath=result_path)
+    print(find_classes)
